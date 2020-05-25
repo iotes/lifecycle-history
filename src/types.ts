@@ -1,7 +1,7 @@
-// Declare types here
 
-export type DeviceTypes = 'DEVICE_TYPE'
+export type HistoryHookStatus = 'LOCAL_ONLY' | 'REMOTE_ONLY' | 'ALL'
 
-export type StrategyConfig = {
-  // Any config specific to your strategy
-}
+export type HistoryHookArgs = [
+  (() => Promise<any[]>)?,
+  boolean?
+]

@@ -1,46 +1,89 @@
 import {
-  DeviceFactory,
-  HostConfig,
-  Strategy,
-  ClientConfig,
-  DeviceConfig,
+  createDeviceDispatchable,
+  CreateIotesHook,
+  IotesHook,
+  Subscriber,
+  IotesEvents,
+  Iotes,
+  Dispatchable,
 } from '@iotes/core'
-import { DeviceTypes, StrategyConfig } from './types'
 
-export const xStrategy: Strategy<StrategyConfig, DeviceTypes> = ({
-  hostDispatch,
-  deviceDispatch,
-  hostSubscribe,
-  deviceSubscribe,
-}) => async (
-  hostConfig: HostConfig<StrategyConfig>,
-  clientConfig: ClientConfig,
-): Promise<DeviceFactory<DeviceTypes>> => {
-  // HOST FACTORY
-  // Do host set up here
+import {
+  HistoryHookArgs,
+  HistoryHookStatus,
+} from './types'
 
-  const deviceFactory = (): DeviceFactory<DeviceTypes> => {
-    // DEVICE FACTORIES
+const historyHook: CreateIotesHook<HistoryHookArgs> = (
+  remoteSource = async () => [],
+  shouldLoadLocal = false,
+): IotesHook => (): IotesEvents => {
+  let history: any[] = []
+  let localHistory: any[] = []
 
-    const createDevice = async (
-      deviceConfig: DeviceConfig<'DEVICE_TYPE'>,
-    ) => {
-      // Do device set up here
-      const deviceSetUp = () => {}
+  const setHistory = (newHistory: any[]) => {
+    history = newHistory
+  }
 
-      deviceSetUp()
-
-      return deviceConfig
-    }
-
-    // Return dictionary of device factories
-    return {
-      DEVICE_TYPE: createDevice,
+  const setLocalHistory = (newHistory: any[]) => {
+    if (typeof window !== 'undefined') {
+      localHistory = newHistory
+      window.localStorage.setItem('IOTES_LOCAL_HISTORY', JSON.stringify(localHistory))
     }
   }
 
-  return deviceFactory()
+  let status: HistoryHookStatus = 'LOCAL_ONLY'
+
+  const postCreate = async (iotes: Iotes) => {
+    const { deviceDispatch } = iotes
+
+    if (shouldLoadLocal && typeof window !== 'undefined') {
+      let fromLocalStorage: any[]
+      try {
+        fromLocalStorage = JSON.parse(localStorage.getItem('IOTES_LOCAL_HISTORY'))
+      } catch {
+        console.warn('Unable to retreive local history from local storage,')
+        fromLocalStorage = []
+      }
+
+      setLocalHistory([...localHistory, ...fromLocalStorage])
+
+      if (localHistory.length > 0) {
+        deviceDispatch(createDeviceDispatchable('IOTES_HISTORY_HOOK', 'LOCAL_ONLY', { localHistory }))
+      }
+    }
+
+    if (remoteSource) {
+      const data = await remoteSource()
+      if (data[0]) {
+        setHistory([...data, ...history])
+        status = 'ALL'
+        deviceDispatch(createDeviceDispatchable('IOTES_HISTORY_HOOK', 'REMOTE_ONLY', { history }))
+      }
+    }
+  }
+
+  const postSubscribe = (newSubscriber: Subscriber) => {
+    const [subscription] = newSubscriber
+    subscription(createDeviceDispatchable('IOTES_HISTORY_HOOK', status, { history }))
+  }
+
+  const preUpdate = (dispatchable: Dispatchable) => {
+    setLocalHistory([...localHistory, dispatchable])
+    setHistory([...history, dispatchable])
+    return dispatchable
+  }
+
+  return {
+    postCreate,
+    device: {
+      postSubscribe,
+      preUpdate,
+    },
+    host: {
+      postSubscribe,
+      preUpdate,
+    },
+  }
 }
 
-// Export types
-export { DeviceTypes, StrategyConfig }
+export const createHistory = historyHook
