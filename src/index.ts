@@ -1,10 +1,10 @@
 import {
+  Iotes,
   createDeviceDispatchable,
   CreateIotesHook,
   IotesHook,
   Subscriber,
   IotesEvents,
-  Iotes,
   Dispatchable,
 } from '@iotes/core'
 
