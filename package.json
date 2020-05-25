@@ -1,6 +1,6 @@
 {
   "name": "@iotes/lifecycle-history",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "A iotes lifecycle hook that allows loading device history from an external source",
   "repository": "git://github.com/iotes/lifecycle-history.git",
   "homepage": "https://iotes.dev",
